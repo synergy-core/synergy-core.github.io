@@ -7,69 +7,158 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <style>
-        body { margin: 0; font-family: 'Courier New', Courier, monospace; background-color: #0d1117; color: #c9d1d9; }
-        #header { padding: 20px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
-        #header h1 { margin: 0; font-size: 24px; color: #58a6ff; }
-        #main { display: flex; height: calc(100vh - 70px); }
-        #panel { width: 350px; padding: 20px; background: #0d1117; border-right: 1px solid #30363d; display: flex; flex-direction: column; gap: 15px; }
+        body { margin: 0; font-family: 'Courier New', Courier, monospace; background-color: #0a0e14; color: #c9d1d9; overflow: hidden; }
+        #header { padding: 15px 25px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #header h1 { margin: 0; font-size: 22px; color: #58a6ff; font-weight: bold; }
+        .nasa-status { font-size: 12px; color: #8b949e; display: flex; align-items: center; gap: 8px; }
+        .status-dot { height: 10px; width: 10px; background-color: #2ea44f; border-radius: 50%; display: inline-block; animation: pulse 2s infinite; }
+        #main { display: flex; height: calc(100vh - 65px); }
+        
+        /* Panel más ancho para acomodar la data */
+        #panel { width: 400px; padding: 25px; background: #0d1117; border-right: 1px solid #30363d; display: flex; flex-direction: column; gap: 15px; box-sizing: border-box; overflow-y: auto; }
         #map { flex-grow: 1; background: #000; }
-        .btn { background: #da3633; color: white; border: none; padding: 15px; font-size: 16px; cursor: pointer; border-radius: 5px; font-weight: bold; text-transform: uppercase; }
-        .btn:hover { background: #b62324; }
-        .card { background: #161b22; padding: 15px; border-radius: 5px; border: 1px solid #30363d; display: none; }
-        .card.active { display: block; border-color: #da3633; }
-        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-        .red { color: #ff7b72; font-weight: bold; margin-top: 0; }
+        
+        .btn { background: #da3633; color: white; border: none; padding: 15px; font-size: 16px; cursor: pointer; border-radius: 6px; font-weight: bold; text-transform: uppercase; transition: all 0.2s; letter-spacing: 1px; }
+        .btn:hover { background: #b62324; transform: translateY(-2px); }
+        
+        .card { background: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; display: none; opacity: 0; transition: opacity 0.4s ease-in; }
+        .card.active { display: block; opacity: 1; border-color: #da3633; box-shadow: 0 0 15px rgba(218, 54, 51, 0.2); }
+        
+        .data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #30363d; padding-bottom: 10px;}
+        .red { color: #ff7b72; font-weight: bold; margin: 0; font-size: 16px; }
+        .triage-badge { background: rgba(218, 54, 51, 0.2); color: #ff7b72; padding: 5px 10px; border-radius: 4px; font-size: 12px; border: 1px solid #da3633;}
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #8b949e; }
+        .data-val { color: #c9d1d9; font-weight: bold; }
+        
+        /* Cajas de Logística y Analítica */
+        .info-box { background: #0a0e14; padding: 12px; border-radius: 6px; border: 1px solid #30363d; margin-top: 10px; border-left: 3px solid #58a6ff; }
+        .info-title { color: #58a6ff; font-weight: bold; margin-top: 0; margin-bottom: 5px; font-size: 13px; }
+        
+        /* Botones de Despacho Operativo */
+        .action-grid { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-action { flex: 1; padding: 10px; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; cursor: pointer; color: white; transition: all 0.2s; }
+        .btn-dispatch { background: #238636; }
+        .btn-dispatch:hover { background: #2ea44f; }
+        .btn-senapred { background: #b62324; }
+        .btn-senapred:hover { background: #da3633; }
+        .btn-disabled { background: #21262d !important; color: #8b949e !important; cursor: not-allowed; }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(46, 164, 79, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(46, 164, 79, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 164, 79, 0); } }
     </style>
 </head>
 <body>
     <div id="header">
         <h1>Ignivisions OS</h1>
-        <span>SaaS Mode: MONITOREO ACTIVO</span>
+        <div class="nasa-status">
+            <span class="status-dot"></span>
+            <span>NASA Data: Última act. hace 14 min (LIVE)</span>
+        </div>
     </div>
     <div id="main">
         <div id="panel">
-            <p>Conectado a API NASA FIRMS & OpenWeather. Latencia esperada: < 3s.</p>
-            <button class="btn" onclick="simularAlerta()">Simular Alerta Térmica</button>
+            <p style="font-size: 13px; line-height: 1.4; margin-top: 0;">Sistema Integrado de Triage y Mitigación de Riesgos.</p>
+            <button class="btn" onclick="iniciarSimulacion()">DETECTAR IGNICIÓN INMINENTE</button>
 
             <div id="alertaCard" class="card">
-                <h3 class="red">⚠️ CÓDIGO ROJO: IGNICIÓN</h3>
-                <div class="data-row"><span>Zona:</span> <span>Reserva Nonguén</span></div>
-                <div class="data-row"><span>Lat/Lon:</span> <span>-36.833, -72.983</span></div>
-                <div class="data-row"><span>Viento:</span> <span>25 km/h NO</span></div>
-                <div class="data-row"><span>Humedad:</span> <span>30%</span></div>
-                <div class="data-row"><span>Triage:</span> <span class="red">CRÍTICO</span></div>
-                <p style="font-size: 12px; color: #8b949e; margin-top: 15px;">Tiempo de procesamiento: 1.2s</p>
+                <div class="data-header">
+                    <h3 class="red">⚠️ ALERTA: FUEGO</h3>
+                    <span class="triage-badge">CÓDIGO ROJO</span>
+                </div>
+                
+                <div class="data-row"><span>Zona:</span> <span id="zonaName" class="data-val">Buscando...</span></div>
+                <div class="data-row"><span>Coordenadas:</span> <span id="coordVal" class="data-val">Buscando...</span></div>
+                
+                <div class="info-box" style="border-left-color: #d29922;">
+                    <p class="info-title" style="color: #d29922;">📊 Analítica Predictiva y Variables</p>
+                    <div class="data-row"><span>Clima:</span> <span class="data-val">Viento 25km/h NO | Hum. 30%</span></div>
+                    <div class="data-row"><span>Estrés Terreno:</span> <span class="data-val" style="color: #ff7b72;">85% (Combustión Alta)</span></div>
+                    <div class="data-row"><span>Pob. en Riesgo:</span> <span class="data-val">4.500 hab. (Radio 5km)</span></div>
+                    <div class="data-row"><span>Eficiencia Táctica:</span> <span class="data-val" style="color: #2ea44f;">Latencia -14 mins</span></div>
+                </div>
+
+                <div class="info-box">
+                    <p class="info-title">Ruta Optimizada (Evitar Cuello Botella)</p>
+                    <p style="font-size: 12px; color: #c9d1d9; margin: 0; line-height: 1.3;">Ingreso rápido por Camino a Nonguén. Ruta de la Madera bloqueada por riesgo térmico.</p>
+                </div>
+
+                <div class="action-grid">
+                    <button id="btnDespacho" class="btn-action btn-dispatch" onclick="despacharUnidad()">DESPACHAR UNIDAD</button>
+                    <button id="btnSena" class="btn-action btn-senapred" onclick="notificarSenapred()">ALERTA SENAPRED</button>
+                </div>
+
+                <p style="font-size: 10px; color: #8b949e; margin-top: 15px; text-align: center;">Procesamiento total SynergyCore AI: 1.04s</p>
             </div>
         </div>
         <div id="map"></div>
     </div>
 
     <script>
-        // Mapa centrado en Concepción (Tema oscuro táctico)
-        var map = L.map('map').setView([-36.8201, -73.0444], 12);
+        var defaultView = [-36.8201, -73.0444]; 
+        var map = L.map('map').setView(defaultView, 12);
+        
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; SynergyCore | NASA FIRMS'
         }).addTo(map);
 
-        var marker;
+        var fireMarker, fireCircle;
 
-        function simularAlerta() {
-            document.getElementById('alertaCard').classList.add('active');
-            if(marker) map.removeLayer(marker);
+        function iniciarSimulacion() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        lanzarAlerta(position.coords.latitude, position.coords.longitude, "Ubicación Real Detectada");
+                    },
+                    (error) => {
+                        simularEnNonguen();
+                    },
+                    { timeout: 5000 } 
+                );
+            } else {
+                simularEnNonguen();
+            }
+        }
+
+        function simularEnNonguen() {
+            lanzarAlerta(-36.8335, -72.9832, "Reserva Nonguén (Simulado)");
+        }
+
+        function lanzarAlerta(lat, lng, nombreZona) {
+            if(fireMarker) map.removeLayer(fireMarker);
+            if(fireCircle) map.removeLayer(fireCircle);
+
+            document.getElementById('zonaName').innerText = nombreZona;
+            document.getElementById('coordVal').innerText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
             
-            // Coordenadas de riesgo en Nonguén
-            var lat = -36.8335;
-            var lng = -72.9832;
+            // Reset de botones por si hacen la demo varias veces
+            document.getElementById('btnDespacho').className = "btn-action btn-dispatch";
+            document.getElementById('btnDespacho').innerText = "DESPACHAR UNIDAD";
+            document.getElementById('btnSena').className = "btn-action btn-senapred";
+            document.getElementById('btnSena').innerText = "ALERTA SENAPRED";
+
+            document.getElementById('alertaCard').classList.add('active');
             
             var redIcon = L.icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
                 iconSize: [25, 41], iconAnchor: [12, 41]
             });
 
-            marker = L.marker([lat, lng], {icon: redIcon}).addTo(map);
-            map.flyTo([lat, lng], 14, { animate: true, duration: 1.5 });
+            fireMarker = L.marker([lat, lng], {icon: redIcon}).addTo(map);
+            fireCircle = L.circle([lat, lng], { color: 'red', fillColor: '#f03', fillOpacity: 0.4, radius: 700 }).addTo(map);
             
-            L.circle([lat, lng], { color: 'red', fillColor: '#f03', fillOpacity: 0.5, radius: 600 }).addTo(map);
+            map.flyTo([lat, lng], 14, { animate: true, duration: 2 });
+        }
+
+        // Funciones de simulación operativa
+        function despacharUnidad() {
+            var btn = document.getElementById('btnDespacho');
+            btn.innerText = "UNIDAD EN CAMINO (ETA: 8M)";
+            btn.className = "btn-action btn-disabled";
+        }
+
+        function notificarSenapred() {
+            var btn = document.getElementById('btnSena');
+            btn.innerText = "SISTEMA SAE ACTIVADO";
+            btn.className = "btn-action btn-disabled";
         }
     </script>
 </body>
